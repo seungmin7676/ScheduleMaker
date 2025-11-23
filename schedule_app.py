@@ -131,33 +131,45 @@ if st.button("스케줄 생성"):
             line = f"{day} {names}"
             output_lines.append(line)
             st.write(line)
-        
-        # 복사용 텍스트 생성
+
+        # 🔥 복사용 텍스트 생성 (이거 없어서 안 됐던 거임!)
         copy_text = "\n".join(output_lines)
-        
-        st.text_area("", copy_text, height=200, key="copy_area")
-        
+
+        # 복사용 텍스트 영역
+        st.subheader("📋 복사하기")
+        st.text_area("Copy Area", copy_text, height=200, key="copy_area")
+
+        # JavaScript 버튼 (주의: 들여쓰기 절대 넣으면 안 됨 → Streamlit이 HTML로 인식 못함)
         copy_js = """
-        <script>
-        function copyText() {
-            const textarea = document.querySelector('textarea[key="copy_area"]');
-            navigator.clipboard.writeText(textarea.value)
-                .then(() => alert("복사 완료!"))
-                .catch(err => alert("복사 실패: " + err));
-        }
-        </script>
-        <button onclick="copyText()" style="
-            padding: 8px 16px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 16px;
-            border-radius: 6px;
-        ">📄 복사하기</button>
-        """
+<script>
+function copyToClipboard() {
+    const textarea = document.getElementById("copy_area");
+    if (!textarea) {
+        alert("textarea를 찾을 수 없습니다!");
+        return;
+    }
+    navigator.clipboard.writeText(textarea.value)
+        .then(() => {
+            alert("복사 완료!");
+        })
+        .catch(err => {
+            alert("복사 실패: " + err);
+        });
+}
+</script>
+
+<button onclick="copyToClipboard()" style="
+    padding: 8px 16px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+">📄 복사하기</button>
+"""
         st.markdown(copy_js, unsafe_allow_html=True)
+
         st.subheader("직원별 배정 일수")
         for e, cnt in assigned_count.items():
             st.write(f"- {e}: {cnt}일")
