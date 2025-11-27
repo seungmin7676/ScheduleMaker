@@ -13,7 +13,6 @@ DAYS = ["월", "화", "수", "목", "금", "토", "일"]
 st.markdown(
     """
 ### 1) 요일별 필요 인원
-원하는 만큼 인원을 설정하면, 그 기준을 맞춰 자동으로 배치합니다.
 """
 )
 
@@ -28,17 +27,10 @@ with st.expander("요일별 필요 인원 설정", expanded=True):
 st.markdown(
     """
 ### 2) 출근 불가 요일 입력
-`이름 - 불가능 요일` 형식으로 적어주세요. 요일이 없는 경우 `x` 또는 공백을 사용합니다.
 """
 )
 
-example = """11.24 일 휴무
-정환 - 월 수
-서정 - x
-수영 - 금 토
-재용 - 토
-상권 - 월 금
-승민 - 목"""
+example = ""
 
 raw = st.text_area("", value=example, height=220)
 
@@ -49,7 +41,7 @@ def parse_input(text):
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     for ln in lines:
         if "-" not in ln:
-            st.warning(f"무시되는 라인(형식오류): {ln}")
+            st.warning(f"")
             continue
         name, right = ln.split("-", 1)
         name = name.strip()
