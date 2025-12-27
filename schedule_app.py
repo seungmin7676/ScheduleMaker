@@ -49,7 +49,7 @@ def parse_input(text):
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     for ln in lines:
         if "-" not in ln:
-            st.warning(f"무시되는 라인(형식오류): {ln}")
+            st.warning(f"")
             continue
         name, right = ln.split("-", 1)
         name = name.strip()
