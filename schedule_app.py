@@ -30,7 +30,13 @@ st.markdown(
 )
 
 example = """"""
-raw = st.text_area("", value=example, height=220)
+raw = st.text_area(
+    "출근 불가 요일 입력",  # 빈 라벨 X
+    value=example,
+    height=220,
+    label_visibility="collapsed"  # 화면에는 숨김
+)
+
 
 
 def parse_input(text: str):
