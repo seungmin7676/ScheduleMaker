@@ -1,11 +1,9 @@
 import re
-
 import streamlit as st
 
 st.set_page_config(page_title="스케줄 자동 생성기", layout="wide")
 
-st.title("스케줄 자동 생성기")
-st.caption("입력에 맞춰 가능한 한 균형 있게 주간 스케줄을 채워줘요.")
+st.title("화포식당 스케줄 자동 생성기")
 
 # 요일 순서: 월 ~ 일
 DAYS = ["월", "화", "수", "목", "금", "토", "일"]
@@ -13,7 +11,6 @@ DAYS = ["월", "화", "수", "목", "금", "토", "일"]
 st.markdown(
     """
 ### 1) 요일별 필요 인원
-원하는 만큼 인원을 설정하면, 그 기준을 맞춰 자동으로 배치합니다.
 """
 )
 
@@ -28,44 +25,38 @@ with st.expander("요일별 필요 인원 설정", expanded=True):
 st.markdown(
     """
 ### 2) 출근 불가 요일 입력
-`이름 - 불가능 요일` 형식으로 적어주세요. 요일이 없는 경우 `x` 또는 공백을 사용합니다.
+`이름 - 불가능 요일` 형식으로 적어주세요. 요일이 없는 경우 `x`를 사용합니다.
 """
 )
 
-example = """11.24 일 휴무
-정환 - 월 수
-서정 - x
-수영 - 금 토
-재용 - 토
-상권 - 월 금
-승민 - 목"""
-
+example = """"""
 raw = st.text_area("", value=example, height=220)
 
 
-# 파싱: 오른쪽에 적힌 요일들은 "출근 불가"로 해석
-def parse_input(text):
+def parse_input(text: str):
+    """'이름 - 불가능 요일' 입력을 파싱해 직원별 불가 요일 리스트를 만든다."""
     employees_blocked = {}
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     for ln in lines:
         if "-" not in ln:
-            st.warning(f"")
             continue
         name, right = ln.split("-", 1)
         name = name.strip()
         right = right.strip()
+
         # x 또는 빈칸 => 제한 없음 (blocked = [])
         if right == "" or right.lower() == "x":
             blocked = []
         else:
             blocked = re.findall(r"(월|화|수|목|금|토|일)", right)
+
         employees_blocked[name] = blocked
     return employees_blocked
 
 
 employees_blocked = parse_input(raw)
 
-# 사용자가 보기 좋게, 각 직원의 실제 "가능한 요일"을 계산
+# 직원별 가능한 요일
 employees_available = {}
 for name, blocked in employees_blocked.items():
     employees_available[name] = [d for d in DAYS if d not in blocked]
@@ -74,9 +65,7 @@ st.subheader("가능한 요일")
 if employees_available:
     with st.container(border=True):
         for name, avail in employees_available.items():
-            st.write(
-                f"- {name}: 가능한 요일 → {', '.join(avail) if avail else '없음(전부 불가)'}"
-            )
+            st.write(f"- {name}: 가능한 요일 → {', '.join(avail) if avail else '없음(전부 불가)'}")
 else:
     st.info("직원 정보를 입력하면 여기에서 확인할 수 있어요.")
 
@@ -87,17 +76,18 @@ MAX_DAYS = 4
 
 
 def attempt_schedule(employees_available, required, min_days):
-    """그리디하게 스케줄을 생성하고, 모든 직원이 min_days 이상 채웠는지 반환."""
-
+    """
+    그리디하게 스케줄을 생성하고,
+    모든 직원이 min_days 이상 채웠는지(success) 반환.
+    """
     schedule = {d: [] for d in DAYS}
     remaining = required.copy()
     assigned_count = {e: 0 for e in employees_available}
 
-    employees_sorted = sorted(
-        employees_available.keys(), key=lambda e: len(employees_available[e])
-    )
+    # 가능한 요일이 적은 직원부터
+    employees_sorted = sorted(employees_available.keys(), key=lambda e: len(employees_available[e]))
 
-    # 1) 최소 일수 우선 배정 (남은 필요 인원이 많은 요일을 먼저 소진)
+    # 1) 최소 일수 우선 배정
     for e in employees_sorted:
         prefer_days = sorted(
             [d for d in DAYS if d in employees_available[e]],
@@ -136,88 +126,60 @@ def attempt_schedule(employees_available, required, min_days):
 
 def generate_schedule(employees_available, required):
     # 1차: 전원 3일 이상 목표
-    schedule, assigned_count, success = attempt_schedule(
-        employees_available, required, MIN_TARGET
-    )
+    schedule, assigned_count, success = attempt_schedule(employees_available, required, MIN_TARGET)
 
     if not success:
         # 2차: 전원 2일 이상 목표로 재시도
-        schedule, assigned_count, _ = attempt_schedule(
-            employees_available, required, SECONDARY_TARGET
-        )
+        schedule, assigned_count, _ = attempt_schedule(employees_available, required, SECONDARY_TARGET)
 
     unmet = [d for d in DAYS if len(schedule[d]) < required[d]]
     return schedule, assigned_count, unmet, success
+
+
+def build_assigned_by_employee(schedule):
+    """schedule(요일->직원들)로부터 직원별 배정 요일 리스트를 만든다."""
+    assigned_by_employee = {e: [] for e in employees_available}
+    for day in DAYS:
+        for name in schedule[day]:
+            if name in assigned_by_employee and day not in assigned_by_employee[name]:
+                assigned_by_employee[name].append(day)
+    return assigned_by_employee
 
 
 if st.button("스케줄 생성", type="primary"):
     if not employees_available:
         st.error("직원 정보가 없습니다. 입력을 확인하세요.")
     else:
-        schedule, assigned_count, unmet, min3_success = generate_schedule(
-            employees_available, required
-        )
+        schedule, assigned_count, unmet, min3_success = generate_schedule(employees_available, required)
 
         st.subheader("생성된 스케줄")
         output_lines = []
-
         for day in DAYS:
             names = " ".join(schedule[day]) if schedule[day] else "휴무/없음"
-            line = f"{day} {names}"
-            output_lines.append(line)
-            st.write(line)
+            output_lines.append(f"{day} {names}")
 
         copy_text = "\n".join(output_lines)
-
-        st.subheader("📋 복사하기")
         st.text_area("Copy Area", copy_text, height=200, key="copy_area")
 
-        copy_js = """
-<script>
-function copyToClipboard() {
-    const textarea = document.getElementById("copy_area");
-    if (!textarea) {
-        alert("textarea를 찾을 수 없습니다!");
-        return;
-    }
-    navigator.clipboard.writeText(textarea.value)
-        .then(() => {
-            alert("복사 완료!");
-        })
-        .catch(err => {
-            alert("복사 실패: " + err);
-        });
-}
-</script>
+        # ✅ 직원별 배정 상세(요일 포함)
+        assigned_by_employee = build_assigned_by_employee(schedule)
 
-<button onclick="copyToClipboard()" style="
-    padding: 8px 16px;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 16px;
-">📄 복사하기</button>
-"""
-        st.markdown(copy_js, unsafe_allow_html=True)
+        st.subheader("직원별 배정 정보")
 
-        st.subheader("직원별 배정 일수")
-        col1, col2 = st.columns(2)
-        with col1:
-            for e, cnt in assigned_count.items():
-                st.write(f"- {e}: {cnt}일")
-        with col2:
-            if min3_success:
-                st.success("모든 인원이 주 3일 이상 근무하도록 배치되었습니다.")
-            else:
-                st.info("3일 배치는 불가능하여, 최소 2일 이상으로 맞췄어요.")
+        st.markdown("**배정 상세**")
+        for e in sorted(assigned_count.keys(), key=lambda x: assigned_count[x], reverse=True):
+            days_list = assigned_by_employee.get(e, [])
+            days_str = ", ".join(days_list) if days_list else "배정 없음"
+            st.write(f"- {e}: {assigned_count[e]}일 / 배정 요일 → {days_str}")
+
+        if min3_success:
+            st.success("모든 인원이 주 3일 이상 근무하도록 배치되었습니다.")
+        else:
+            st.info("3일 배치는 불가능하여, 최소 2일 이상으로 맞췄어요.")
 
         if unmet:
             for d in unmet:
-                st.error(
-                    f"{d}요일: 필요한 인원({required[d]})을 채우지 못했습니다. (배정: {len(schedule[d])})"
-                )
+                st.error(f"{d}요일: 필요한 인원({required[d]})을 채우지 못했습니다. (배정: {len(schedule[d])})")
 
 st.divider()
 
@@ -229,7 +191,6 @@ st.markdown(
 )
 
 manual_example = """"""
-
 manual_text = st.text_area(
     "직접 작성한 스케줄 입력",
     value=manual_example,
@@ -238,7 +199,7 @@ manual_text = st.text_area(
 )
 
 
-def parse_manual_schedule(text):
+def parse_manual_schedule(text: str):
     schedule = {d: [] for d in DAYS}
     invalid_lines = []
 
@@ -247,15 +208,11 @@ def parse_manual_schedule(text):
         if not match:
             invalid_lines.append(ln)
             continue
+
         day, rest = match.groups()
         tokens = re.findall(r"[^\s,]+", rest)
-        names = [
-            token
-            for token in tokens
-            if token not in {"휴무/없음", "휴무", "없음", "-", "x", "X"}
-        ]
-        unique_names = list(dict.fromkeys(names))
-        schedule[day] = unique_names
+        names = [t for t in tokens if t not in {"휴무/없음", "휴무", "없음", "-", "x", "X"}]
+        schedule[day] = list(dict.fromkeys(names))  # 중복 제거(입력 순서 유지)
 
     return schedule, invalid_lines
 
@@ -265,7 +222,9 @@ if st.button("스케줄 검증"):
         st.error("직원 정보가 없습니다. 출근 불가 요일을 입력해주세요.")
     else:
         manual_schedule, invalid_lines = parse_manual_schedule(manual_text)
+
         assigned_days = {e: 0 for e in employees_available}
+        assigned_by_employee = {e: [] for e in employees_available}
         blocked_violations = []
         unknown_names = set()
 
@@ -274,25 +233,23 @@ if st.button("스케줄 검증"):
                 if name not in employees_available:
                     unknown_names.add(name)
                     continue
+
                 if day in employees_blocked[name]:
                     blocked_violations.append((name, day))
-                assigned_days[name] += 1
 
-        missing_min_days = [
-            name for name, cnt in assigned_days.items() if cnt < MIN_TARGET
-        ]
+                assigned_days[name] += 1
+                if day not in assigned_by_employee[name]:
+                    assigned_by_employee[name].append(day)
+
+        missing_min_days = [name for name, cnt in assigned_days.items() if cnt < MIN_TARGET]
 
         st.subheader("검증 결과")
+
         if invalid_lines:
-            st.warning(
-                "형식 오류로 무시된 라인이 있습니다: " + ", ".join(invalid_lines)
-            )
+            st.warning("형식 오류로 무시된 라인이 있습니다: " + ", ".join(invalid_lines))
 
         if unknown_names:
-            st.warning(
-                "직원 목록에 없는 이름이 포함되어 있습니다: "
-                + ", ".join(sorted(unknown_names))
-            )
+            st.warning("직원 목록에 없는 이름이 포함되어 있습니다: " + ", ".join(sorted(unknown_names)))
 
         if blocked_violations:
             st.error("출근 불가 요일에 배정된 항목이 있습니다.")
@@ -304,6 +261,12 @@ if st.button("스케줄 검증"):
         if missing_min_days:
             st.error("주 3일 이상 근무 조건을 충족하지 못한 인원이 있습니다.")
             for name in missing_min_days:
-                st.write(f"- {name}: {assigned_days[name]}일")
+                st.write(f"- {name}: {assigned_days[name]}일 / 배정 요일 → {', '.join(assigned_by_employee[name]) if assigned_by_employee[name] else '배정 없음'}")
         else:
             st.success("모든 인원이 주 3일 이상 근무합니다.")
+
+        st.subheader("직원별 배정 상세")
+        for name in sorted(assigned_days.keys(), key=lambda x: assigned_days[x], reverse=True):
+            days_list = assigned_by_employee[name]
+            days_str = ", ".join(days_list) if days_list else "배정 없음"
+            st.write(f"- {name}: {assigned_days[name]}일 / 배정 요일 → {days_str}")
