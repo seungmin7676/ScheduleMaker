@@ -268,7 +268,7 @@ def parse_manual_schedule(text):
 
 if st.button("스케줄 검증"):
     if not employees_available:
-        st.error("직원 정보가 없습니다. 먼저 출근 불가 요일을 입력해주세요.")
+        st.error("직원 정보가 없습니다. 출근 불가 요일을 입력해주세요.")
     else:
         manual_schedule, invalid_lines = parse_manual_schedule(manual_text)
         assigned_days = {e: 0 for e in employees_available}
