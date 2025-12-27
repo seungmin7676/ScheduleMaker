@@ -13,6 +13,7 @@ DAYS = ["월", "화", "수", "목", "금", "토", "일"]
 st.markdown(
     """
 ### 1) 요일별 필요 인원
+원하는 만큼 인원을 설정하면, 그 기준을 맞춰 자동으로 배치합니다.
 """
 )
 
@@ -27,10 +28,17 @@ with st.expander("요일별 필요 인원 설정", expanded=True):
 st.markdown(
     """
 ### 2) 출근 불가 요일 입력
+`이름 - 불가능 요일` 형식으로 적어주세요. 요일이 없는 경우 `x` 또는 공백을 사용합니다.
 """
 )
 
-example = ""
+example = """11.24 일 휴무
+정환 - 월 수
+서정 - x
+수영 - 금 토
+재용 - 토
+상권 - 월 금
+승민 - 목"""
 
 raw = st.text_area("", value=example, height=220)
 
@@ -210,5 +218,98 @@ function copyToClipboard() {
                 st.error(
                     f"{d}요일: 필요한 인원({required[d]})을 채우지 못했습니다. (배정: {len(schedule[d])})"
                 )
+
+st.divider()
+
+st.markdown(
+    """
+### 3) 직접 작성한 스케줄 검증
+아래에 직접 만든 스케줄을 입력하면 **출근 불가 요일**과 **주 3일 이상 근무** 조건을 확인합니다.
+"""
+)
+
+manual_example = """월 정환 상권
+화 서정 수영
+수 정환
+목 승민
+금 수영 상권
+토 재용
+일 휴무/없음"""
+
+manual_text = st.text_area(
+    "직접 작성한 스케줄 입력",
+    value=manual_example,
+    height=200,
+    help="각 줄에 '요일 이름1 이름2 ...' 형식으로 입력하세요.",
+)
+
+
+def parse_manual_schedule(text):
+    schedule = {d: [] for d in DAYS}
+    invalid_lines = []
+
+    for ln in [line.strip() for line in text.splitlines() if line.strip()]:
+        match = re.match(r"^(월|화|수|목|금|토|일)\s*(.*)$", ln)
+        if not match:
+            invalid_lines.append(ln)
+            continue
+        day, rest = match.groups()
+        tokens = re.findall(r"[^\s,]+", rest)
+        names = [
+            token
+            for token in tokens
+            if token not in {"휴무/없음", "휴무", "없음", "-", "x", "X"}
+        ]
+        unique_names = list(dict.fromkeys(names))
+        schedule[day] = unique_names
+
+    return schedule, invalid_lines
+
+
+if st.button("스케줄 검증"):
+    if not employees_available:
+        st.error("직원 정보가 없습니다. 먼저 출근 불가 요일을 입력해주세요.")
+    else:
+        manual_schedule, invalid_lines = parse_manual_schedule(manual_text)
+        assigned_days = {e: 0 for e in employees_available}
+        blocked_violations = []
+        unknown_names = set()
+
+        for day in DAYS:
+            for name in manual_schedule[day]:
+                if name not in employees_available:
+                    unknown_names.add(name)
+                    continue
+                if day in employees_blocked[name]:
+                    blocked_violations.append((name, day))
+                assigned_days[name] += 1
+
+        missing_min_days = [
+            name for name, cnt in assigned_days.items() if cnt < MIN_TARGET
+        ]
+
+        st.subheader("검증 결과")
+        if invalid_lines:
+            st.warning(
+                "형식 오류로 무시된 라인이 있습니다: " + ", ".join(invalid_lines)
+            )
+
+        if unknown_names:
+            st.warning(
+                "직원 목록에 없는 이름이 포함되어 있습니다: "
+                + ", ".join(sorted(unknown_names))
+            )
+
+        if blocked_violations:
+            st.error("출근 불가 요일에 배정된 항목이 있습니다.")
+            for name, day in blocked_violations:
+                st.write(f"- {name}: {day}요일 불가")
         else:
-            st.success("모든 요일의 필요 인원이 충족되었습니다.")
+            st.success("출근 불가 요일 배정 없음")
+
+        if missing_min_days:
+            st.error("주 3일 이상 근무 조건을 충족하지 못한 인원이 있습니다.")
+            for name in missing_min_days:
+                st.write(f"- {name}: {assigned_days[name]}일")
+        else:
+            st.success("모든 인원이 주 3일 이상 근무합니다.")
