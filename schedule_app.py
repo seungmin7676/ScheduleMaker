@@ -228,13 +228,7 @@ st.markdown(
 """
 )
 
-manual_example = """월 정환 상권
-화 서정 수영
-수 정환
-목 승민
-금 수영 상권
-토 재용
-일 휴무/없음"""
+manual_example = """"""
 
 manual_text = st.text_area(
     "직접 작성한 스케줄 입력",
