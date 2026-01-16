@@ -167,7 +167,7 @@ if st.button("스케줄 생성", type="primary"):
         copy_text = "\n".join(output_lines)
         st.text_area("Copy Area", copy_text, height=200, key="copy_area")
 
-        # ✅ 직원별 배정 상세(요일 포함)
+        # 직원별 배정 상세(요일 포함)
         assigned_by_employee = build_assigned_by_employee(schedule)
 
         st.subheader("직원별 배정 정보")
